@@ -1,0 +1,66 @@
+#include<vkd/context.h>
+#include <format>
+
+namespace vkd::exec
+{
+	ThreadType ThreadType::MainThread{ ThreadTypeE::MianThread  };
+	ThreadType ThreadType::ComputeThread{ ThreadTypeE::Compute };
+	ThreadType ThreadType::GraphicsThread{ ThreadTypeE::Graphics };
+
+
+	Context::Context()
+		:threadPoolLoop_{}, mainThreadLoop{} {
+		std::jthread([this] (){
+				graphicsThreadLoop.run();
+		})
+		.detach();
+
+	}
+
+	Context::~Context() {
+	}
+
+	void Context::run() {
+		mainThreadLoop.run();
+	}
+
+	void Context::poll() {
+		mainThreadLoop.poll();
+	}
+
+	Scheduler Context::getScheduler(ThreadType type) {
+		if (type == ThreadType::MainThread) {
+			return mainThreadLoop.get_scheduler();
+		}
+		else if (type == ThreadType::GraphicsThread) {
+			return graphicsThreadLoop.get_scheduler();
+		}
+		else if (type == ThreadType::ComputeThread) {
+			return threadPoolLoop_.get_scheduler();
+		}
+		else {
+			std::shared_lock lock{ threadLoopsMutex_ };
+			auto it = customThreadLoops_.find(type);
+			if (it == customThreadLoops_.end())
+			{
+				throw std::out_of_range(std::format("Thread type {}",type.value()));
+			}
+			return it->second->get_scheduler();
+		}
+	}
+	void Context::addCustomThreadLoop(ThreadType type, SchedulerProvider* loop) {
+		if( type == ThreadType::MainThread ||
+			type == ThreadType::GraphicsThread ||
+			type == ThreadType::ComputeThread) {
+			throw std::invalid_argument("Cannot add custom thread loop for predefined thread types");
+		}
+
+		if (loop == nullptr) {
+			throw std::invalid_argument("Loop cannot be null");
+		}
+
+		std::unique_lock lock{ threadLoopsMutex_ };
+		customThreadLoops_.emplace(type, loop);
+		
+	}
+}

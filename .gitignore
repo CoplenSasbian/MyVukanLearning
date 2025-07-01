@@ -2,4 +2,5 @@
 .vscode/
 bin/
 build/
+out/
 
