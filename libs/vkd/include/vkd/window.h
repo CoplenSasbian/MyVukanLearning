@@ -105,7 +105,7 @@ namespace vkd::window {
         
         virtual ~Event(){}
     protected:
-        Event(const NativeEvent&);
+        DLL_API Event(const NativeEvent&);
 		friend class EventLoop;
 		Window* window_;
         bool preventDefault_ = false;
@@ -123,7 +123,7 @@ namespace vkd::window {
 			return size_;
 		};
     protected:
-        SizeEvent(const NativeEvent&);
+        DLL_API SizeEvent(const NativeEvent&);
 		Size size_;
 	};
 
@@ -134,7 +134,7 @@ namespace vkd::window {
 			return position_;
 		}
     protected:
-        MoveEvent(const NativeEvent&);
+        DLL_API MoveEvent(const NativeEvent&);
 		Point position_; 
 	};
 
@@ -145,7 +145,7 @@ namespace vkd::window {
 			return gained_;
 		}
     protected:
-        FocusEvent(const NativeEvent&);
+        DLL_API FocusEvent(const NativeEvent&);
 		bool gained_:1;  
 	};
 
@@ -179,7 +179,7 @@ namespace vkd::window {
             return modifiers_;
         } 
     protected:
-        KeyEvent(const NativeEvent&);
+        DLL_API KeyEvent(const NativeEvent&);
 
         uint16_t  keyCode_;
         uint8_t modifiers_;
@@ -208,7 +208,7 @@ namespace vkd::window {
         }
 
     protected:
-        MouseEvent(const NativeEvent&);
+        DLL_API MouseEvent(const NativeEvent&);
         Point position_;   
         MouseButton button_:4; 
         bool pressed_:1;      
@@ -226,7 +226,7 @@ namespace vkd::window {
         }  
 
     protected:
-        WheelEvent(const NativeEvent&);
+        DLL_API WheelEvent(const NativeEvent&);
         int delta_;     
         Point position_;
     };
@@ -239,7 +239,7 @@ namespace vkd::window {
         }  
 
     protected:
-        PaintEvent(const NativeEvent&);
+        DLL_API PaintEvent(const NativeEvent&);
         Rect region_;  
     };
 
@@ -251,7 +251,7 @@ namespace vkd::window {
         }  
 
     protected:
-        ShowEvent(const NativeEvent&);
+        DLL_API ShowEvent(const NativeEvent&);
         bool shown_:1;
     };
 
@@ -263,7 +263,7 @@ namespace vkd::window {
         }  
 
     protected:
-        IconifyEvent(const NativeEvent&);
+        DLL_API IconifyEvent(const NativeEvent&);
         bool iconified_:1;
     };
 
@@ -279,7 +279,7 @@ namespace vkd::window {
         } 
 
     protected:
-        FileDropEvent(const NativeEvent&);
+        DLL_API FileDropEvent(const NativeEvent&);
         std::vector<std::wstring> files_;
         Point position_;
     };
