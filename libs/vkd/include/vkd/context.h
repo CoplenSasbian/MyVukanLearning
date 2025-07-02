@@ -5,35 +5,35 @@
 #include <cassert>
 #include <shared_mutex>
 
+
+
 namespace vkd::exec {
 
 
-	class ThreadType{
-		enum  ThreadTypeE :std::uint32_t{
+	class ThreadType {
+
+		enum  ThreadTypeE :std::uint32_t {
 			MianThread = 1,
 			Compute = 2,
 			Graphics = 3,
 			Custom = 0xFF
 		};
-	public:
-		static ThreadType MainThread;
-		static ThreadType ComputeThread;
-		static ThreadType GraphicsThread;
 
-		static ThreadType Custom(std::uint32_t offset) {
-			assert((static_cast<std::uint32_t>(ThreadTypeE::Custom) + offset) >= static_cast<std::uint32_t>(ThreadTypeE::Custom) && "Offset causes underflow or invalid custom value");
+	public:
+		DLL_API static ThreadType MainThread;
+		DLL_API static ThreadType ComputeThread;
+		DLL_API static ThreadType GraphicsThread;
+
+		static ThreadType custom(std::uint32_t offset) {
 			return ThreadType(static_cast<std::uint32_t>(ThreadTypeE::Custom) + offset);
 		}
 
-		operator std::uint32_t() const {
-			return type_;
+		bool operator==(const ThreadType& right)  const {
+			return type_ == right.type_;
 		}
 
-		bool operator==(const ThreadType& other) const {
-			return type_ == other.type_;
-		}
 
-		std::uint32_t value() {
+		std::uint32_t value() const {
 			return type_;
 		}
 
@@ -48,7 +48,19 @@ namespace vkd::exec {
 		std::uint32_t type_;
 
 	};
+}
 
+namespace std {
+	template <>
+	struct hash<vkd::exec::ThreadType> {
+		inline
+			std::size_t  operator()(const vkd::exec::ThreadType& type) const noexcept {
+			return std::hash<std::uint32_t>()(type.value());
+		}
+	};
+}
+
+namespace vkd::exec {
 
 	class Context {
 
@@ -75,5 +87,6 @@ namespace vkd::exec {
 
 	};
 
-
 }
+
+

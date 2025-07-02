@@ -1,5 +1,4 @@
 #pragma once
-
 #include <stdexec/execution.hpp>
 
 namespace std::execution {

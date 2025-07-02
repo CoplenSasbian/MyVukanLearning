@@ -3,14 +3,14 @@
 
 namespace vkd::exec
 {
-	ThreadType ThreadType::MainThread{ ThreadTypeE::MianThread  };
-	ThreadType ThreadType::ComputeThread{ ThreadTypeE::Compute };
-	ThreadType ThreadType::GraphicsThread{ ThreadTypeE::Graphics };
+	ThreadType ThreadType::MainThread{ std::to_underlying(ThreadTypeE::MianThread)};
+	ThreadType ThreadType::ComputeThread{ std::to_underlying(ThreadTypeE::Compute) };
+	ThreadType ThreadType::GraphicsThread{ std::to_underlying(ThreadTypeE::Graphics) };
 
 
 	Context::Context()
 		:threadPoolLoop_{}, mainThreadLoop{} {
-		std::jthread([this] (){
+		std::thread([this] (){
 				graphicsThreadLoop.run();
 		})
 		.detach();
@@ -49,9 +49,10 @@ namespace vkd::exec
 		}
 	}
 	void Context::addCustomThreadLoop(ThreadType type, SchedulerProvider* loop) {
-		if( type == ThreadType::MainThread ||
-			type == ThreadType::GraphicsThread ||
-			type == ThreadType::ComputeThread) {
+		if( (ThreadType::ComputeThread == type)||
+			(ThreadType::MainThread == type)||
+			(ThreadType::GraphicsThread == type)
+			) {
 			throw std::invalid_argument("Cannot add custom thread loop for predefined thread types");
 		}
 
@@ -59,7 +60,7 @@ namespace vkd::exec
 			throw std::invalid_argument("Loop cannot be null");
 		}
 
-		std::unique_lock lock{ threadLoopsMutex_ };
+		std::lock_guard lock{ threadLoopsMutex_ };
 		customThreadLoops_.emplace(type, loop);
 		
 	}

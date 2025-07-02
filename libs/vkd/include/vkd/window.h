@@ -104,9 +104,9 @@ namespace vkd::window {
         }
         
         virtual ~Event(){}
-    protected:
         DLL_API Event(const NativeEvent&);
-		friend class EventLoop;
+    protected:
+        friend class EventLoop;
 		Window* window_;
         bool preventDefault_ = false;
 	};
@@ -122,8 +122,9 @@ namespace vkd::window {
 		const Size& rect()const {
 			return size_;
 		};
-    protected:
         DLL_API SizeEvent(const NativeEvent&);
+
+    protected:
 		Size size_;
 	};
 
@@ -133,8 +134,9 @@ namespace vkd::window {
 		const Point& position() const {
 			return position_;
 		}
-    protected:
         DLL_API MoveEvent(const NativeEvent&);
+
+    protected:
 		Point position_; 
 	};
 
@@ -144,8 +146,9 @@ namespace vkd::window {
 		bool gained() const {
 			return gained_;
 		}
-    protected:
         DLL_API FocusEvent(const NativeEvent&);
+
+    protected:
 		bool gained_:1;  
 	};
 
@@ -178,8 +181,9 @@ namespace vkd::window {
         uint8_t modifiers() const {
             return modifiers_;
         } 
-    protected:
         DLL_API KeyEvent(const NativeEvent&);
+
+    protected:
 
         uint16_t  keyCode_;
         uint8_t modifiers_;
@@ -206,9 +210,9 @@ namespace vkd::window {
         bool pressed() const {
             return pressed_;
         }
+        DLL_API MouseEvent(const NativeEvent&);
 
     protected:
-        DLL_API MouseEvent(const NativeEvent&);
         Point position_;   
         MouseButton button_:4; 
         bool pressed_:1;      
@@ -224,9 +228,9 @@ namespace vkd::window {
         const Point& position() const {
             return position_;
         }  
+        DLL_API WheelEvent(const NativeEvent&);
 
     protected:
-        DLL_API WheelEvent(const NativeEvent&);
         int delta_;     
         Point position_;
     };
@@ -237,9 +241,9 @@ namespace vkd::window {
         const Rect& region() const {
             return region_;
         }  
+        DLL_API PaintEvent(const NativeEvent&);
 
     protected:
-        DLL_API PaintEvent(const NativeEvent&);
         Rect region_;  
     };
 
@@ -249,9 +253,9 @@ namespace vkd::window {
         bool shown() const {
             return shown_;
         }  
+        DLL_API ShowEvent(const NativeEvent&);
 
     protected:
-        DLL_API ShowEvent(const NativeEvent&);
         bool shown_:1;
     };
 
@@ -261,9 +265,9 @@ namespace vkd::window {
         bool iconified() const {
             return iconified_;
         }  
+        DLL_API IconifyEvent(const NativeEvent&);
 
     protected:
-        DLL_API IconifyEvent(const NativeEvent&);
         bool iconified_:1;
     };
 
@@ -277,39 +281,44 @@ namespace vkd::window {
         const Point& dropPosition() const {
             return position_;
         } 
+        DLL_API FileDropEvent(const NativeEvent&);
 
     protected:
-        DLL_API FileDropEvent(const NativeEvent&);
         std::vector<std::wstring> files_;
         Point position_;
     };
+
+    class EventLoop;
+
+
     struct EventListener {
-        void (*start_)(EventListener*);
+        void (*start_)(EventListener*,const Event* e);
         std::type_index type_;
     };
 
-    template<std::execution::receiver R>
+    template<std::execution::receiver R,class E>
     struct Op:EventListener {
        
 
         friend void tag_invoke(std::execution::start_t, const Op* self) {
             self->start_();
         }
-        Op(std::type_index type, EventLoop* loop, R&& r)
-            :type_(type), loop_(loop), r_(std::forward<R>(r)) {
+
+        Op( EventLoop* loop, R&& r)
+            : loop_(loop), r_(std::forward<R>(r)) {
             start_ = start__;
-        };
+			addListener();
+        }
 
-
-
-        static void start__(Starter* s) {
-            auto self = static_cast<Op<R>*>(s);
+        static void start__(EventListener* s,Event* e) {
+            auto self = static_cast<Op<R,E>*>(s);
             try {
-                if (std::execution::get_stop_token(std::execution::get_env(r_))..stop_requested()) {
+                if (std::execution::get_stop_token(std::execution::get_env(r_)).stop_requested()) {
                     std::execution::set_stopped(r_);
                     return;
                 }
-                std::execution::set_value(r_);
+
+                std::execution::set_value(r_,(E*)(e));
             }
             catch (...) {
                 std::execution::set_error(std::current_exception());
@@ -317,64 +326,79 @@ namespace vkd::window {
         }
 
         void addListener();
+
+        ~Op()
+        {
+
+        }
     private:
         EventLoop* loop_;
         R r_;
     };
 
-    class EventListenSender {
-        class EventLoop;
-    public:
-        using completion_signatures = stdexec::completion_signatures<
-            stdexec::set_value_t(),
-            stdexec::set_error_t(std::exception_ptr),
-            stdexec::set_stopped_t()>;
-        template<class E>
-            requires std::derived_from<E, Event>
-        EventListenSender(EventLoop* loop)
-            :type_(typeid(E)),loop_(loop){}
 
-        std::execution::empty_env get_env() { return {}; }
-        friend std::execution::empty_env tag_invoke(std::execution::get_env_t, const EventListenSender&) {
+    template<class E>
+    class EventListenSender:public std::execution::sender_t {
+    public:
+        using completion_signatures = std::execution::completion_signatures<
+            std::execution::set_value_t(const E*),
+            std::execution::set_error_t(std::exception_ptr),
+            std::execution::set_stopped_t()>;
+        
+        EventListenSender(const EventLoop* loop)
+            :loop_(loop){}
+
+		EventListenSender(EventListenSender&&)noexcept = default;
+		EventListenSender(const EventListenSender&) = default;
+
+        std::execution::empty_env get_env() const noexcept { return {}; }
+
+        inline
+        friend std::execution::empty_env tag_invoke(std::execution::get_env_t, const EventListenSender&) noexcept{
             return {};
         }
 
         template<std::execution::receiver R>
-        friend Op<R> tag_invoke(std::execution::connect_t, EventListenSender& self,R&& r) {
+        friend Op<R,E> tag_invoke(std::execution::connect_t, const EventListenSender& self,R&& r) {
+			std::printf("EventListenSender::connect\n");
             return {
-                self.type_,
                 self.loop_,
                 std::forward<R>(r)
             };
         }
 
+
+
     private:
-        std::type_index type_;
-        EventLoop* loop_;
+        const EventLoop* loop_;
+
     };
   
 
-	class EventLoop {
+	class DLL_API EventLoop {
 		
 	public:
-        DLL_API void registerWindow(Window*)const;
-        DLL_API bool  pollEvent()const;
-        DLL_API void setEvent(const Event*);
+         EventLoop();
+         void registerWindow(Window*)const;
+         bool  pollEvent()const;
+         void setEvent(const Event*);
+
         template<class E>
         requires std::derived_from<E,Event>
-        auto on() {
-            
+        EventListenSender<E> on() {
+            return EventListenSender<E>(this);
         }
     protected:
-        template<std::execution::receiver R>
+        template<std::execution::receiver R,class E>
         friend struct Op;
-        DLL_API void addListener(EventListener* listener);
+        void addListener(EventListener* listener);
     private:
         std::shared_mutex mutex_;
         std::unordered_map<std::type_index, std::vector<EventListener*>> listeners_;
 	};
-    template<std::execution::receiver R>
-    inline void Op<R>::addListener()
+
+    template<std::execution::receiver R,class E>
+    inline void Op<R,E>::addListener()
     {
         loop_->addListener(this);
     }

@@ -13,7 +13,10 @@ namespace vkd::exec {
 			PTP_CLEANUP_GROUP cleanupGroup = nullptr;
 		};
 
-		ThreadPool::ThreadPool() {
+		ThreadPool::ThreadPool() 
+			:__p(std::make_unique<Pimpl>())
+		{
+			
 			void* pool = nullptr;
 			::InitializeThreadpoolEnvironment(&(__p->callbackEnv));
 			auto poolId = ::CreateThreadpool(nullptr);
@@ -25,7 +28,7 @@ namespace vkd::exec {
 
 
 			__p->cleanupGroup = ::CreateThreadpoolCleanupGroup();
-			if (__p->cleanupGroup) {
+			if (__p->cleanupGroup == nullptr) {
 				throw std::runtime_error("Failed to create thread pool cleanup group");
 			}
 

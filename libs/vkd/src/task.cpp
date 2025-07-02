@@ -3,7 +3,7 @@
 
 namespace vkd::exec {
 
-
+	TaskQueue::TaskQueue() {}
 	void TaskQueue::push(Task* task)
 	{
 		task->next_ = &head_;

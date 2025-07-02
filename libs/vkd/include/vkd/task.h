@@ -29,7 +29,7 @@ namespace vkd::exec{
 		DLL_API Task* pop();
 		bool empty() const;
 	private:
-		Task head_{ {}, &head_,{&head_} };
+		Task head_{ {},  &head_, &head_ };
 	};
 
 }

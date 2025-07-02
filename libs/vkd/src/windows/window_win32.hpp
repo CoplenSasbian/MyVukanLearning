@@ -24,6 +24,9 @@ namespace vkd::window {
 		std::unique_ptr<Event> event;
 
 		auto pel = (EventLoop*)::GetWindowLongPtrW(e.hwnd, EventLoopOffset);
+		if(!pel) {
+			return DefWindowProcW(e.hwnd, e.message, e.wParam, e.lParam);
+		}
 
 		switch (e.message) {
 		case WM_CLOSE:
@@ -89,6 +92,7 @@ namespace vkd::window {
 		}
 
 		if (event) {
+
 			pel->setEvent(event.get());
 
 			if (!event->hasPreventDefault()) {
@@ -310,6 +314,9 @@ namespace vkd::window {
 		DragFinish(hDrop);
 	}
 
+	EventLoop::EventLoop() {
+	}
+
 	void EventLoop::registerWindow(Window* win)const {
 		auto hWnd = (HWND)win->nativeHandel();
 		::SetWindowLongPtrW(hWnd, EventLoopOffset, (intptr_t)this);
@@ -332,7 +339,7 @@ namespace vkd::window {
 
 		for (auto listener : copy)
 		{
-			listener->start_(listener);
+			listener->start_(listener,e);
 		}
 	}
 

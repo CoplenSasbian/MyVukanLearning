@@ -13,21 +13,24 @@ namespace vkd::exec {
 			Finshed = 1,
 			Canceled = 0b10,
 		};
-
-		~DelayTask()  {};
-		DelayTask() :Task{} {};
 		
+		~DelayTask()  {};
+		
+		DelayTask() :Task{}, flag_{} {};
+		
+		inline
 		bool hasFinshed() const {
 			return flag_ & Finshed;
 		};
 
+		inline
 		bool hasCancel() const{
 			return flag_ & Canceled;
 		
 		}
 		
 	private:
-		uint8_t flag_;
+		uint8_t flag_ ;
 		friend class ThreadPool;
 	};
 
@@ -45,24 +48,24 @@ namespace vkd::exec {
 		friend class ThreadPool;
 	};
 
-	class ThreadPool {
+	class DLL_API ThreadPool {
 		class Pimpl;
 	
 	public:
-		DLL_API ThreadPool();
-		DLL_API ThreadPool(ThreadPool&&) noexcept;
-		DLL_API void setMaxThreads(int count) ;
-		DLL_API void addTask(Task* task);
+		 ThreadPool();
+		 ThreadPool(ThreadPool&&) noexcept;
+		 void setMaxThreads(int count) ;
+		 void addTask(Task* task);
 
-		DLL_API void addDelayTask(DelayTask* task,int ms);
+		 void addDelayTask(DelayTask* task,int ms);
 
-		DLL_API void cancelDelayTask(DelayTask* task);
+		 void cancelDelayTask(DelayTask* task);
 
-		DLL_API void addIntervalTask(IntervalTask* task, int ms);
+		 void addIntervalTask(IntervalTask* task, int ms);
 
-		DLL_API void cancelIntervalTask(IntervalTask* task);
+		 void cancelIntervalTask(IntervalTask* task);
 
-		DLL_API ~ThreadPool();
+		 ~ThreadPool();
 	private:
 		std::unique_ptr<Pimpl> __p;
 	
