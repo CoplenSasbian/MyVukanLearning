@@ -1,4 +1,4 @@
-#include "windows/threadpool_win32.hpp"
+#include "windows/threadpool.hpp"
 
 namespace vkd::exec {
 

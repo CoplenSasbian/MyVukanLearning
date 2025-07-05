@@ -30,4 +30,9 @@ private:
 	vkd::window::Window window_;
 	vkd::window::EventLoop eventLoop_;
 
+	vkd::window::EventListenHolder closeListener_;
+	
+	vkd::window::EventListenHolder quitListener_;
+	vkd::window::EventListenHolder sizeListener_;
+	vkd::window::EventListenHolder clickListener_;
 };

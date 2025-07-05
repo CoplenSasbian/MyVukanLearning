@@ -114,6 +114,12 @@ namespace vkd::window {
         Window* window_;
         bool preventDefault_ = false;
     };
+
+
+   template<class E>
+   concept EventType = std::derived_from<E, Event>;
+
+
     class CloseEvent :public Event {
         friend class EventLoop;
     public:
@@ -304,123 +310,86 @@ namespace vkd::window {
     };
 
 
-
-    class EventLoop;
-
-
-    struct EventListener {
-        void (*start_)(EventListener*,const Event* e) noexcept;
+ 
+ 
+    struct ListenerHolder {
+        ListenerHolder(std::type_index type):type_(type){};
         std::type_index type_;
-
-        EventListener(decltype(start_) start, std::type_index type)
-            :start_(start), type_(type)
-        {};
-        EventListener(EventListener&&) noexcept = default;
-        EventListener(const EventListener&)noexcept = default;
+        void(*exec_)(ListenerHolder*, const Event*)noexcept
+            = nullptr;
     };
-
-    template<std::execution::receiver R,class E>
-    struct Op:public EventListener {
-       
-        Op(EventLoop* loop, R&& r)
-            :EventListener(start__, typeid(E)),  loop_(loop), r_(std::forward<R>(r)) {
-          
-        }
-        Op(Op&&) noexcept = default;
-        
-        Op(const Op&)noexcept = default;
-
-        static void start__(EventListener* s,const Event* e) noexcept {
-            auto self = static_cast<Op*>(s);
-            try {
-                if (std::execution::get_stop_token(std::execution::get_env(self->r_)).stop_requested()) {
-                    std::execution::set_stopped(self->r_);
-                    return;
-                }
-                std::execution::set_value(self->r_,(E*)(e));
-            }
-            catch (...) {
-                std::execution::set_error(self->r_,std::current_exception());
-            }
-        }
-
-         void addListener() noexcept;
-
-        ~Op(){}
-
-        friend void tag_invoke(std::execution::start_t, Op & self)noexcept{
-            self.start();
-        }
-        void start() noexcept{
-            addListener();
-        }
-
-        //static_assert(std::execution::operation_state<Op>);
-    private:
-        EventLoop* loop_;
-        R r_;
-    };
-
-
-    template<class E>
-    class EventListenSender:public std::execution::sender_t {
+    template<class Task>
+    class Listener:public ListenerHolder {
     public:
-        using completion_signatures = std::execution::completion_signatures<
-            std::execution::set_value_t(const E*),
-            std::execution::set_error_t(std::exception_ptr),
-            std::execution::set_stopped_t()>;
-        
-        EventListenSender(EventLoop* loop)
-            :loop_(loop){
+
+        Listener(Task&& task,std::type_index type)
+        :ListenerHolder(type),task_(std::forward<Task>(task)){
+            exec_ = __exec_;
         }
-
-		EventListenSender(EventListenSender&&)noexcept = default;
-		EventListenSender(const EventListenSender&) = default;
-
-
-        template<std::execution::receiver R>
-        friend Op<R,E> tag_invoke(std::execution::connect_t,EventListenSender& self,R&& r) noexcept{
-            return {
-                self.loop_,
-                std::forward<R>(r)
-            };
-        }
-
+      
     private:
-        EventLoop* loop_;
-
-    };
-  
-
-	class DLL_API EventLoop {
-		
-	public:
-         EventLoop();
-         void registerWindow(Window*)const;
-         bool  pollEvent();
-         void setEvent(const Event*);
-
-         void postQuitEvent() const;
-
-        template<class E>
-        requires std::derived_from<E,Event>
-        EventListenSender<E> on() {
-            return EventListenSender<E>(this);
+        static void __exec_(ListenerHolder* h, const Event* e) noexcept{
+            auto self = (Listener*)h;
+            try{
+                std::execution::start_detached(
+                    std::execution::just(e)
+                    | self->task_
+                );
+            }
+            catch (...)
+            {
+               
+            }
         }
+
+        Task task_;
+    };
+
+    class DLL_API EventLoop {
+
+    public:
+        EventLoop();
+        void registerWindow(Window*)const;
+        bool  pollEvent() noexcept;
+        void setEvent(const Event*);
+
+        void postQuitEvent() const;
+
+        template<EventType E, class S>
+        std::unique_ptr<ListenerHolder> on(S&& s) {
+            auto task = std::execution::then([](const Event* e) {return (E*)e;}) 
+                | std::forward<S>( s);
+
+            auto listener = std::make_unique<Listener<decltype(task)>>(std::move(task), std::type_index{typeid(E)});
+            ___addListenerHolder(listener.get());
+            return listener;
+        }
+        template<class T>
+            requires std::derived_from<T, ListenerHolder> || std::same_as<T, ListenerHolder>
+        void pauseListener(const std::unique_ptr<T>& listener){
+            ___removeListenerHolder(listener.get());
+        }
+        template<class T>
+            requires std::derived_from<T, ListenerHolder> || std::same_as<T, ListenerHolder>
+        void resumeListener(const std::unique_ptr<T>& listener) {
+            ___addListenerHolder(listener.get());
+        }
+
+
     protected:
-        template<std::execution::receiver R,class E>
-        friend struct Op;
-        void addListener(EventListener* listener);
+
+        void ___addListenerHolder(ListenerHolder*);
+        
+        void ___removeListenerHolder(ListenerHolder*);
+       
     private:
         std::shared_mutex mutex_;
-        std::unordered_map<std::type_index, std::vector<EventListener*>> listeners_;
+        std::unordered_map<std::type_index, std::vector<ListenerHolder*>> listeners_;
 	};
 
-    template<std::execution::receiver R,class E>
-    inline void Op<R,E>::addListener()  noexcept
-    {
-        loop_->addListener(this);
-    }
+    using EventListenHolder = std::unique_ptr<ListenerHolder>;
+ 
+
 
   
 

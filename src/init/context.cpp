@@ -47,24 +47,33 @@ exec::task<void> AppContext::create_window()
 
 exec::task<void> AppContext::addEventListener()
 {
-	auto winClose = eventLoop_.on<vkd::window::CloseEvent>() |
-		std::execution::then([&](const vkd::window::CloseEvent* e) {
+	
+
+	closeListener_ = eventLoop_.on<vkd::window::CloseEvent>(std::execution::then([&](const vkd::window::CloseEvent* e) {
 		eventLoop_.postQuitEvent();
-		});
+	}));
 
-	auto quitListener = eventLoop_.on<vkd::window::QuitEvent>() |
-		std::execution::then([&](const vkd::window::QuitEvent* e) {
+	sizeListener_ = eventLoop_.on<vkd::window::SizeEvent>(std::execution::then([&](const vkd::window::SizeEvent* e) {
+		std::println("size: {} {}", e->size().width,e->size().height );
+		}));
+	quitListener_ = eventLoop_.on<vkd::window::QuitEvent>(std::execution::then([&](const vkd::window::QuitEvent* e) {
 		quit_ = true;
-		});
+	}));
 
-	auto sizeChangeListener = eventLoop_.on<vkd::window::SizeEvent>() |
-		std::execution::then([&](const vkd::window::SizeEvent* e) {
-		std::println("resize :{} {}", e->size().x, e->size().y);
-		});
+	clickListener_ = eventLoop_.on<vkd::window::MouseEvent>(std::execution::then([&](const vkd::window::MouseEvent* e) {
+		static bool on = true;
+		
+		if (e->button() == e->MB_R && e->pressed()) {
+			on = !on;
+			if (on) {
+				eventLoop_.resumeListener(sizeListener_);
+			}else{
+				eventLoop_.pauseListener(sizeListener_);
+			}
+		}
+		
+	}));
 
-	std::execution::start_detached(winClose);
-	std::execution::start_detached(quitListener);
-	std::execution::start_detached(sizeChangeListener);
 	co_return;
 }
 

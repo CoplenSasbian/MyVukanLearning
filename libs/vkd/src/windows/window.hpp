@@ -5,6 +5,7 @@
 #include <windowsx.h>
 #include <mutex>
 #include <cassert>
+#include <vkd/exception/system_error.h>
 
 namespace vkd::window {
 
@@ -126,7 +127,7 @@ namespace vkd::window {
 			wc.hInstance = GetModuleHandleW(nullptr);
 			wc.lpszClassName = WindowClassName;
 			if (!RegisterClassExW(&wc)) {
-				throw std::runtime_error("Failed to register window class");
+				throw vkd::SystemError("Failed to register window class —{RegisterWindowClass(&wc)}");
 			}
 			});
 
@@ -164,7 +165,7 @@ namespace vkd::window {
 			x, y, width, height,
 			NULL, NULL, GetModuleHandleW(nullptr), this);
 		if (!impl_->hWnd_) {
-			throw std::runtime_error("Failed to create window");
+			throw vkd::SystemError("Failed to create window —{ Window::create(...)}");
 		}
 
 	}
@@ -195,17 +196,20 @@ namespace vkd::window {
 
 	void Window::show(WindowShow ws)const {
 
-		::ShowWindow(impl_->hWnd_, toWin32Show(ws));
+		if (::ShowWindow(impl_->hWnd_, toWin32Show(ws))) {
+			throw vkd::SystemError(" Close window error —Window::show()", impl_->hWnd_);
+		}
 	}
 
 
 	void Window::close()const {
-		::CloseWindow(impl_->hWnd_);
+		if (::CloseWindow(impl_->hWnd_))
+			throw vkd::SystemError(" Close window error —Window::close()", impl_->hWnd_);
 	}
 
 
 
-	bool EventLoop::pollEvent() 
+	bool EventLoop::pollEvent() noexcept
 	{
 		static NativeEvent event{};
 
@@ -315,17 +319,25 @@ namespace vkd::window {
 		DragFinish(hDrop);
 	}
 
-	EventLoop::EventLoop() {
-	}
+	EventLoop::EventLoop() {}
 
 	void EventLoop::registerWindow(Window* win)const {
 		auto hWnd = (HWND)win->nativeHandel();
 		::SetWindowLongPtrW(hWnd, EventLoopOffset, (intptr_t)this);
 
 	}
-	void  EventLoop::addListener(EventListener* listener) {
+	void  EventLoop::___addListenerHolder(ListenerHolder* listener) {
 		std::unique_lock lock{ mutex_ };
 		listeners_[listener->type_].push_back(listener);
+	}
+	void EventLoop::___removeListenerHolder(ListenerHolder* listener) {
+		std::unique_lock lock{ mutex_ };
+		
+		if (auto found = listeners_.find(listener->type_); found != listeners_.end()) {
+			if (auto found2 = std::ranges::find(found->second, listener); found2 != found->second.end()) {
+				found->second.erase(found2);
+			}
+		}
 	}
 
 	void EventLoop::setEvent(const Event* e) {
@@ -340,7 +352,7 @@ namespace vkd::window {
 
 		for (auto listener : copy)
 		{
-			listener->start_(listener,e);
+			listener->exec_(listener, e);
 		}
 	}
 
