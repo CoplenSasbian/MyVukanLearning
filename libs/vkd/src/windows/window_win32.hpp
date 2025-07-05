@@ -14,20 +14,14 @@ namespace vkd::window {
 
 	constexpr intptr_t WndClassOffset = GWLP_USERDATA;
 
-	constexpr intptr_t EventLoopOffset = GWLP_USERDATA + sizeof(void*);
+	constexpr intptr_t EventLoopOffset = 0;
 	struct NativeEvent :MSG
 	{
 	};
 
 
-	LRESULT transformEvent(const NativeEvent& e) {
-		std::unique_ptr<Event> event;
-
-		auto pel = (EventLoop*)::GetWindowLongPtrW(e.hwnd, EventLoopOffset);
-		if(!pel) {
-			return DefWindowProcW(e.hwnd, e.message, e.wParam, e.lParam);
-		}
-
+	static std::unique_ptr<Event> doCreateEvent(const NativeEvent& e) {
+		std::unique_ptr<Event> event = nullptr;
 		switch (e.message) {
 		case WM_CLOSE:
 			event = std::make_unique<CloseEvent>(e);
@@ -74,7 +68,6 @@ namespace vkd::window {
 		case WM_SHOWWINDOW:
 			event = std::make_unique<ShowEvent>(e);
 			break;
-
 		case WM_WINDOWPOSCHANGED: {
 			WINDOWPOS* pos = reinterpret_cast<WINDOWPOS*>(e.lParam);
 			if (pos->flags & SWP_HIDEWINDOW) {
@@ -86,21 +79,21 @@ namespace vkd::window {
 		case WM_DROPFILES:
 			event = std::make_unique<FileDropEvent>(e);
 			break;
-
-		default:
-			return DefWindowProcW(e.hwnd, e.message, e.wParam, e.lParam);
 		}
 
-		if (event) {
+		return event;
+	}
 
+	static LRESULT transformWindowEvent(const NativeEvent& e) {
+		if(auto pel = (EventLoop*)::GetWindowLongPtrW(e.hwnd, EventLoopOffset); pel)
+		if (auto event = doCreateEvent(e); event) {
+			
 			pel->setEvent(event.get());
-
-			if (!event->hasPreventDefault()) {
-				return DefWindowProcW(e.hwnd, e.message, e.wParam, e.lParam);
+			if (event->hasPreventDefault()) {
+				return S_OK;
 			}
 		}
-
-		return  0;
+		return DefWindowProcW(e.hwnd, e.message, e.wParam, e.lParam);
 	}
 
 	LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -110,12 +103,14 @@ namespace vkd::window {
 			SetWindowLongPtrW(hWnd, WndClassOffset, reinterpret_cast<LONG_PTR>(window));
 			return DefWindowProcW(hWnd, message, wParam, lParam);
 		}
+		
 		NativeEvent e;
 		e.hwnd = hWnd;
 		e.message = message;
 		e.wParam = wParam;
 		e.lParam = lParam;
-		return transformEvent(e);
+		return transformWindowEvent(e);
+
 	};
 
 
@@ -125,6 +120,7 @@ namespace vkd::window {
 		std::call_once(onceFlag, []() {
 			WNDCLASSEXW wc = {};
 			wc.cbSize = sizeof(WNDCLASSEXW);
+			wc.style = 0;
 			wc.cbWndExtra = 8 * sizeof(intptr_t);
 			wc.lpfnWndProc = WindowProc;
 			wc.hInstance = GetModuleHandleW(nullptr);
@@ -208,11 +204,16 @@ namespace vkd::window {
 	}
 
 
-	bool EventLoop::pollEvent() const
+
+	bool EventLoop::pollEvent() 
 	{
 		static NativeEvent event{};
 
 		if (::PeekMessageW(&event, 0, 0, 0, PM_REMOVE)) {
+			if (event.message == WM_QUIT) {
+				std::unique_ptr< QuitEvent>  qe = std::make_unique<QuitEvent>(event);
+				setEvent( qe.get());
+			};
 			::TranslateMessage(&event);
 			::DispatchMessageW(&event);
 			return true;
@@ -331,16 +332,20 @@ namespace vkd::window {
 		std::shared_lock lock{ mutex_ };
 
 		auto found = listeners_.find(e->type());
-		if (found != listeners_.end()) {
+		if (found == listeners_.end()) {
 			return;
 		}
-		auto copy =  found->second;
+		std::vector copy =  found->second;
 		lock.unlock();
 
 		for (auto listener : copy)
 		{
 			listener->start_(listener,e);
 		}
+	}
+
+	void EventLoop::postQuitEvent()const {
+		::PostQuitMessage(0);
 	}
 
 

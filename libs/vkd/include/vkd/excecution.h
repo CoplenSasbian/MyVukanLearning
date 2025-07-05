@@ -51,7 +51,7 @@ namespace vkd::exec::__detail {
 			Task::execute_ = &OperationState::execute_;
 		}
 		void start() const noexcept;
-		friend void tag_invoke(stdexec::start_t, const OperationState& self) noexcept {
+		friend void tag_invoke(stdexec::start_t, OperationState& self) noexcept {
 			self.start();
 		}
 
