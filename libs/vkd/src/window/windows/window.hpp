@@ -1,6 +1,6 @@
 #pragma once
 #ifdef WIN32
-#include <vkd/window.h>
+#include <vkd/window/window.h>
 #include <Windows.h>
 #include <windowsx.h>
 #include <mutex>

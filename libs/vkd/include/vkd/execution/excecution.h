@@ -1,7 +1,7 @@
 #pragma once
 #include "threadpool.h"
-#include "execution/stdexec.h"
-#include "core.h"
+#include "stdexec.h"
+#include "../core.h"
 #include "task.h"
 namespace vkd::exec::__detail {
 

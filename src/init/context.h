@@ -1,7 +1,7 @@
 
 #pragma once
-#include <vkd/context.h>
-#include <vkd/window.h>
+#include <vkd/execution/context.h>
+#include <vkd/window/window.h>
 #include <exec/task.hpp>
 class AppContext :public vkd::ImMoveable, vkd::NonCopyable {
 public:
