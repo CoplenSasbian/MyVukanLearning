@@ -19,8 +19,10 @@ target_include_directories(${LIBNAME} PUBLIC
 find_package(proxy CONFIG REQUIRED)
 find_package(mimalloc CONFIG REQUIRED)
 find_package(stdexec  CONFIG REQUIRED)
-target_link_libraries(${LIBNAME} PUBLIC msft_proxy mimalloc STDEXEC::stdexec)
+find_package(Vulkan REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
+target_link_libraries(${LIBNAME} PUBLIC msft_proxy mimalloc STDEXEC::stdexec Vulkan::Vulkan spdlog::spdlog )
 
 include(GenerateExportHeader)
 generate_export_header(${LIBNAME}

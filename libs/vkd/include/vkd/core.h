@@ -1,6 +1,10 @@
 #pragma once
 #include "window_export.h"
+
+
+
 namespace vkd{
+
 	struct ImMoveable {
 		ImMoveable() = default;
 		~ImMoveable() = default;

@@ -25,6 +25,7 @@ find_package(mimalloc CONFIG REQUIRED)
 find_package(proxy CONFIG REQUIRED)
 find_package(stdexec  CONFIG REQUIRED)
 
+
 target_link_libraries(vulkan_demo PRIVATE mimalloc msft_proxy STDEXEC::stdexec vkd)
 
 

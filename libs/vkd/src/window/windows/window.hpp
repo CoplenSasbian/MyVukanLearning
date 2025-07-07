@@ -158,7 +158,6 @@ namespace vkd::window {
 		int height = rect.height == -1 ? CW_USEDEFAULT : rect.height;
 
 		assert(x > 0 && y > 0 && width > 200 && height > 200 && "Create rect error");
-
 		impl_->hWnd_ = CreateWindowExW(
 			0, WindowClassName, title.c_str(),
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
