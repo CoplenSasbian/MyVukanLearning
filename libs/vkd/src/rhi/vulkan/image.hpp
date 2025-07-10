@@ -3,14 +3,19 @@
 #include<vkd/rhi/rhi_image.h>
 #include "config.hpp"
 namespace vkd::rhi {
-	class  VKImage :public RHIImage, public VulkanImpl {
+	class  VKImage :public RHIImage, public DeviceProvider {
 	public:
-		VKImage(VulkanImpl* device, vk::Image&& image)
-			:VulkanImpl(device), image_(std::move(image_)){
-			
+		VKImage(DeviceProvider* device, vk::Image&& image)
+			:DeviceProvider(device), image_(std::move(image_)){
+		 
 		}
 		
-		
+
+
+		~VKImage() {
+			if(image_)
+				device_->destroyImage(image_);
+		}
 		
 		
 	public:

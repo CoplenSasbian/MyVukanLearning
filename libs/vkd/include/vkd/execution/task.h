@@ -1,16 +1,16 @@
 #pragma once
 #include "../core.h"
+#include <tbb/concurrent_queue.h>
 namespace vkd::exec{
 	
-	struct Task :public ImMoveable {
-		
+	
+	struct Task:public ImMoveable {
+
 		union
 		{
-			// for queue head node
 			Task* tail_ = nullptr;
 			void (*execute_)(Task*);
 		};
-
 		union 
 		{
 			// for queue node
@@ -29,7 +29,12 @@ namespace vkd::exec{
 		DLL_API Task* pop();
 		bool empty() const;
 	private:
-		Task head_{ {},  &head_, &head_ };
+		Task head_{ {},  &head_ ,&head_ };
 	};
+
+
+	
+	using TbbConcurrentTaskQueue = tbb::concurrent_queue<Task*>;
+
 
 }

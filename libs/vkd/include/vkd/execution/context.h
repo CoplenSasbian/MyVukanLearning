@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cassert>
 #include <shared_mutex>
-
+#include <tbbexec/tbb_thread_pool.hpp>
 
 
 namespace vkd::exec {
@@ -78,12 +78,10 @@ namespace vkd::exec {
 	private:
 		vkd::exec::ThreadPoolLoop threadPoolLoop_;
 		vkd::exec::ThreadLoop mainThreadLoop;
-
-		//std::jthread graphicsThread_;
-		vkd::exec::ThreadLoop graphicsThreadLoop;
-
 		std::shared_mutex threadLoopsMutex_;
 		std::unordered_map<ThreadType, vkd::exec::SchedulerProvider*> customThreadLoops_;
+		tbbexec::tbb_thread_pool graphicsThreadPool_;
+
 
 	};
 

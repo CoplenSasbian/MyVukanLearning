@@ -9,46 +9,44 @@ namespace vkd::exec::__detail
 
 	void ThreadRunLoop::run() {
 		while (!stop_) {
-			std::unique_lock lock(mutex_);
-			cv_.wait(lock, [&] {return !queue_.empty(); });
-			Task* task = queue_.pop();
-			lock.unlock();
-			if (task) {
+			Task* task;
+			if (queue_.try_pop(task)) {
 				task->execute_(task);
 			}
+#if defined(_MSC_VER) || defined(__INTEL_COMPILER)
+			_mm_pause();  
+#elif defined(__GNUC__) && (__i386__ || __x86_64__)
+			__asm__ __volatile__("pause");
+#else
+			static std::atomic_flag flag = ATOMIC_FLAG_INIT;
+			flag.clear(std::memory_order_release); 
+#endif
 		}
 	}
 
 	void ThreadRunLoop::poll() {
 		while (!stop_) {
-			std::unique_lock lock(mutex_);
 			if(queue_.empty()) return;
-
-			Task* task = queue_.pop();
-			lock.unlock();
-
-			if (task) {
+			Task* task ;
+			if (queue_.try_pop(task)) {
 				task->execute_(task);
+			}
+			else {
+				break;
 			}
 		}
 	}
 
 	void ThreadRunLoop::_push(const SchedulerProvider* self, Task* task) {
 		auto* loop = const_cast<ThreadRunLoop*>(static_cast<const ThreadRunLoop*>(self));
-
-		std::unique_lock lock(loop->mutex_);
 		loop->queue_.push(task);
-		lock.unlock();
-		loop->cv_.notify_one();
 	}
 	ThreadRunLoop::~ThreadRunLoop() {
 		stop_ = true;
-		cv_.notify_all();
 	}
 
 
 	ThreadPoolRunLoop::ThreadPoolRunLoop()
-	
 	{
 		pushTask = &ThreadPoolRunLoop::_push;
 	}

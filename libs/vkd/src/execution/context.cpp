@@ -9,12 +9,8 @@ namespace vkd::exec
 
 
 	Context::Context()
-		:threadPoolLoop_{}, mainThreadLoop{} {
-		std::thread([this] (){
-				graphicsThreadLoop.run();
-		})
-		.detach();
-
+		:threadPoolLoop_{}, mainThreadLoop{}, graphicsThreadPool_{} {
+	
 	}
 
 	Context::~Context() {
@@ -33,7 +29,7 @@ namespace vkd::exec
 			return mainThreadLoop.get_scheduler();
 		}
 		else if (type == ThreadType::GraphicsThread) {
-			return graphicsThreadLoop.get_scheduler();
+			return 		graphicsThreadPool_.get_scheduler();
 		}
 		else if (type == ThreadType::ComputeThread) {
 			return threadPoolLoop_.get_scheduler();

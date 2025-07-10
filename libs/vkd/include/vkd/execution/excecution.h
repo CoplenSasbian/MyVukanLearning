@@ -178,9 +178,11 @@ namespace vkd::exec::__detail {
 		DLL_API static void _push(const SchedulerProvider* self, Task* task);
 
 		bool stop_ = false;
-		std::mutex mutex_;
+	/*	std::mutex mutex_;
 		std::condition_variable cv_;
-		TaskQueue queue_;
+		TaskQueue queue_;*/
+
+		TbbConcurrentTaskQueue queue_;
 	};
 
 

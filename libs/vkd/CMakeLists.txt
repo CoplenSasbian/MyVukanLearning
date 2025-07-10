@@ -21,8 +21,8 @@ find_package(mimalloc CONFIG REQUIRED)
 find_package(stdexec  CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-
-target_link_libraries(${LIBNAME} PUBLIC msft_proxy mimalloc STDEXEC::stdexec Vulkan::Vulkan spdlog::spdlog )
+find_package(tbb CONFIG REQUIRED)
+target_link_libraries(${LIBNAME} PUBLIC msft_proxy mimalloc STDEXEC::stdexec Vulkan::Vulkan spdlog::spdlog tbb)
 
 include(GenerateExportHeader)
 generate_export_header(${LIBNAME}

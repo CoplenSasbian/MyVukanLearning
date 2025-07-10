@@ -4,37 +4,49 @@
 #include "config.hpp"
 #include <ranges>
 #include <spdlog/spdlog.h>
+#include "image.hpp"
 namespace vkd::rhi{
 
-	class VKDevice : public RHIDevice ,public DeviceProvider {
-	public:
+    class VKDevice : public RHIDevice, public DeviceProvider {
+    public:
 
-        VKDevice():DeviceProvider(nullptr){}
+        VKDevice() :DeviceProvider(nullptr) {}
 
-		~VKDevice() {
-		}
+        ~VKDevice() {
 
-		bool init(void* nativeHandel ) override{
+        }
+
+        bool init(void* nativeHandel, int width, int height) override {
             hWnd_ = (HWND)nativeHandel;
             CreateInstance();
             SelectDevice();
             CreateDevice();
-            createSwapchain();
-		}
+            createSwapchain(width, height);
+        }
 
+        exec::task<void> asyncResizeSwapchain(int width, int height)override {
+            
+        }
+        
+        uint64_t submitCommands(std::span<RHICommandList*> commands) override {
+            
+            
+        }
+   
 
         vk::UniqueInstance instance_{};
         vk::UniqueDevice uniqueDevice_{};
         vk::PhysicalDevice physicalDevice_ = nullptr;
         vk::UniqueSurfaceKHR surface_{};
         vk::UniqueSwapchainKHR swapchain_{};
-        std::vector<RHIImage> swapchainImages_{};
-        std::array<vk::Queue, 3> queues_;
+        std::vector<std::unique_ptr<VKImage> > swapchainImages_{};
         std::array<std::uint32_t, 3> familyIndexes_;
 
 
         HWND hWnd_;
     private:
+
+
         void CreateInstance()
         {
             vk::ApplicationInfo appInfo(
@@ -44,7 +56,7 @@ namespace vkd::rhi{
                 VK_MAKE_VERSION(1, 0, 0),
                 VK_API_VERSION_1_0
             );
-            
+
             vk::InstanceCreateInfo createInfo(
                 {},
                 &appInfo,
@@ -58,7 +70,7 @@ namespace vkd::rhi{
             instance_ = vk::createInstanceUnique(createInfo);
 
             spdlog::info("Vulkan instance created");
-            
+
         }
         void SelectDevice() {
             auto devices = instance_->enumeratePhysicalDevices();
@@ -66,74 +78,74 @@ namespace vkd::rhi{
             int maxRamScore = 0;
             vk::PhysicalDevice currentDevice = nullptr;
             std::string name;
-            
-            for (auto& d: devices){
-             
-               int baseScore = 0;
-               int ramScore = 0;
+
+            for (auto& d : devices) {
+
+                int baseScore = 0;
+                int ramScore = 0;
 
 
 
-               vk::PhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures = {};
+                vk::PhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures = {};
 
-               vk::PhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructureFeatures{ };
+                vk::PhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructureFeatures{ };
 
-               vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
+                vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
 
-               vk::PhysicalDeviceFeatures2 deviceFeatures2{};
-
-
-               accelerationStructureFeatures.pNext = &meshShaderFeatures;
-               rtPipelineFeatures.pNext = &accelerationStructureFeatures;
-               deviceFeatures2.pNext = &rtPipelineFeatures;
+                vk::PhysicalDeviceFeatures2 deviceFeatures2{};
 
 
-               d.getFeatures2(deviceFeatures2);
+                accelerationStructureFeatures.pNext = &meshShaderFeatures;
+                rtPipelineFeatures.pNext = &accelerationStructureFeatures;
+                deviceFeatures2.pNext = &rtPipelineFeatures;
 
 
-               auto props = d.getProperties2();
-               if (props.properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-                   baseScore += 1000;
-
-               if (props.properties.deviceType == vk::PhysicalDeviceType::eIntegratedGpu)
-                   baseScore += 100;
-
-               if (props.properties.deviceType == vk::PhysicalDeviceType::eVirtualGpu || props.properties.deviceType == vk::PhysicalDeviceType::eCpu)
-                   baseScore += 10;
-
-               auto memProps = d.getMemoryProperties2();
-               
-               for (uint32_t i = 0; i < memProps.memoryProperties.memoryHeapCount; i++) {
-                   if (memProps.memoryProperties.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-                       ramScore += static_cast<int>(memProps.memoryProperties.memoryHeaps[i].size / (1024 * 1024 * 1024)) * 200;
-                   }
-               }
-               spdlog::info("Found device:{} {}GB .{} {}", 
-                   props.properties.deviceName.data(),
-                   ramScore / 200,
-                   meshShaderFeatures.meshShader?"Mesh Shader.":"",
-                   rtPipelineFeatures.rayTracingPipeline?"Ray tracing.":"");
-               
-
-               if (!meshShaderFeatures.meshShader || !rtPipelineFeatures.rayTracingPipeline)
-                   continue;
+                d.getFeatures2(deviceFeatures2);
 
 
+                auto props = d.getProperties2();
+                if (props.properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+                    baseScore += 1000;
 
-               if (baseScore >= maxBaseScore) {
-                   maxBaseScore = baseScore;
-                   if (ramScore > maxRamScore) {
-                       maxRamScore = ramScore;
-                       currentDevice = d;
-                       name = props.properties.deviceName.data();
-                   }
-               }
-               
+                if (props.properties.deviceType == vk::PhysicalDeviceType::eIntegratedGpu)
+                    baseScore += 100;
+
+                if (props.properties.deviceType == vk::PhysicalDeviceType::eVirtualGpu || props.properties.deviceType == vk::PhysicalDeviceType::eCpu)
+                    baseScore += 10;
+
+                auto memProps = d.getMemoryProperties2();
+
+                for (uint32_t i = 0; i < memProps.memoryProperties.memoryHeapCount; i++) {
+                    if (memProps.memoryProperties.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+                        ramScore += static_cast<int>(memProps.memoryProperties.memoryHeaps[i].size / (1024 * 1024 * 1024)) * 200;
+                    }
+                }
+                spdlog::info("Found device:{} {}GB .{} {}",
+                    props.properties.deviceName.data(),
+                    ramScore / 200,
+                    meshShaderFeatures.meshShader ? "Mesh Shader." : "",
+                    rtPipelineFeatures.rayTracingPipeline ? "Ray tracing." : "");
+
+
+                if (!meshShaderFeatures.meshShader || !rtPipelineFeatures.rayTracingPipeline)
+                    continue;
+
+
+
+                if (baseScore >= maxBaseScore) {
+                    maxBaseScore = baseScore;
+                    if (ramScore > maxRamScore) {
+                        maxRamScore = ramScore;
+                        currentDevice = d;
+                        name = props.properties.deviceName.data();
+                    }
+                }
+
             }
             spdlog::info("Select device:{} {}GB", name, maxRamScore / 200);
             physicalDevice_ = currentDevice;
 
-            
+
         }
 
         void CreateDevice() {
@@ -142,7 +154,7 @@ namespace vkd::rhi{
                 auto flag = queueFamilies[i].queueFamilyProperties.queueFlags;
                 if (flag & vk::QueueFlagBits::eGraphics) {
                     familyIndexes_[std::to_underlying(CommandListType::Graphics)] = i;
-                    spdlog::info("Graphycs queue family index",i);
+                    spdlog::info("Graphycs queue family index", i);
                     continue;
                 }
                 if (flag & vk::QueueFlagBits::eTransfer) {
@@ -168,16 +180,13 @@ namespace vkd::rhi{
             }
 
             float queuePriority = 1;
-           
+
             std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos = {
                 {{},familyIndexes_[std::to_underlying(CommandListType::Graphics)], 1, &queuePriority},
                 {{},familyIndexes_[std::to_underlying(CommandListType::Transfer)], 1, &queuePriority},
-                { {},familyIndexes_[std::to_underlying(CommandListType::Compute)], 1,& queuePriority }
+                { {},familyIndexes_[std::to_underlying(CommandListType::Compute)], 1,&queuePriority }
             };
-         
 
-       
-               
 
 
             vk::DeviceCreateInfo deviceCreateInfo(
@@ -188,22 +197,14 @@ namespace vkd::rhi{
             );
 
             uniqueDevice_ = physicalDevice_.createDeviceUnique(deviceCreateInfo);
-            
+
             device_ = uniqueDevice_.operator->();
 
             spdlog::info("Device created.");
 
-            for (size_t i = 0; i < 3; i++)
-            {
-                queues_[i] = uniqueDevice_->getQueue(familyIndexes_[i],1);
-
-            }
-
-          
-
         }
-        void  createSwapchain() {
-            
+        void  createSwapchain(int width, int height) {
+
             vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo{
             {},
             GetModuleHandleW(nullptr),
@@ -215,16 +216,25 @@ namespace vkd::rhi{
             vk::SwapchainCreateInfoKHR swapchainInfo{
            {},
            *surface_,
-           2, // 双缓冲
+           2,
            vk::Format::eB8G8R8A8Unorm,
            vk::ColorSpaceKHR::eSrgbNonlinear,
-           {800, 600}, // 硬编码分辨率
+           {width, height},
            1,
            vk::ImageUsageFlagBits::eColorAttachment
             };
             swapchain_ = device_->createSwapchainKHRUnique(swapchainInfo);
-            swapchainImages_ = device_->getSwapchainImagesKHR(*swapchain_);
+            swapchainImages_ = device_->getSwapchainImagesKHR(*swapchain_)
+                | std::views::transform([&](vk::Image& i) {
+                return  std::make_unique<VKImage>(this, std::move(i));
+                    })
+                | std::ranges::to<std::vector>()
+                ;
         }
+
+
+        
+        
 	};
 
    
